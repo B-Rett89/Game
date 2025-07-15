@@ -1,7 +1,13 @@
 import pygame
 import random
 import os
+import sys
 import math
+
+# Some platforms (like Android) expose touch events via FINGER* constants.
+FINGERDOWN = getattr(pygame, 'FINGERDOWN', None)
+FINGERMOTION = getattr(pygame, 'FINGERMOTION', None)
+FINGERUP = getattr(pygame, 'FINGERUP', None)
 
 WIDTH, HEIGHT = 800, 600
 FPS = 60
@@ -19,6 +25,23 @@ pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 24)
+
+# Detect if running on Android
+ON_ANDROID = ('ANDROID_ARGUMENT' in os.environ or sys.platform.startswith('android'))
+
+# Setup joystick for bluetooth gamepad if available
+pygame.joystick.init()
+joystick = None
+if pygame.joystick.get_count() > 0:
+    joystick = pygame.joystick.Joystick(0)
+    joystick.init()
+
+# Touch input state
+touch_state = {
+    'move': [0, 0],
+    'origin': (0, 0),
+    'moving': False
+}
 
 # Simple textures stored as surfaces
 def create_surface(color, size=(TILE_SIZE, TILE_SIZE)):
@@ -133,14 +156,30 @@ def draw_hud():
 
 def handle_input():
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_a]:
-        player_pos[0] -= player_speed
-    if keys[pygame.K_d]:
-        player_pos[0] += player_speed
-    if keys[pygame.K_w]:
-        player_pos[1] -= player_speed
-    if keys[pygame.K_s]:
-        player_pos[1] += player_speed
+    move_x = 0
+    move_y = 0
+    if keys[pygame.K_a] or keys[pygame.K_LEFT]:
+        move_x -= 1
+    if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
+        move_x += 1
+    if keys[pygame.K_w] or keys[pygame.K_UP]:
+        move_y -= 1
+    if keys[pygame.K_s] or keys[pygame.K_DOWN]:
+        move_y += 1
+
+    # Joystick controls
+    if joystick:
+        move_x += joystick.get_axis(0)
+        move_y += joystick.get_axis(1)
+        if joystick.get_button(0):
+            shoot((player_pos[0], player_pos[1] - 100))
+
+    # Touch controls
+    move_x += touch_state['move'][0]
+    move_y += touch_state['move'][1]
+
+    player_pos[0] += int(move_x * player_speed)
+    player_pos[1] += int(move_y * player_speed)
 
 
 def shoot(target_pos):
@@ -281,6 +320,24 @@ def main():
                     running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and state == 'play':
                 shoot(event.pos)
+            if ON_ANDROID:
+                if FINGERDOWN and event.type == FINGERDOWN:
+                    x = event.x * WIDTH
+                    y = event.y * HEIGHT
+                    if x < WIDTH / 2:
+                        touch_state['origin'] = (x, y)
+                        touch_state['moving'] = True
+                    else:
+                        shoot((x, y))
+                elif FINGERMOTION and event.type == FINGERMOTION and touch_state['moving']:
+                    x = event.x * WIDTH
+                    y = event.y * HEIGHT
+                    dx = x - touch_state['origin'][0]
+                    dy = y - touch_state['origin'][1]
+                    touch_state['move'] = [dx / 40.0, dy / 40.0]
+                elif FINGERUP and event.type == FINGERUP:
+                    touch_state['move'] = [0, 0]
+                    touch_state['moving'] = False
         if state == 'play':
             handle_input()
             update_bullets()

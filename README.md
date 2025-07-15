@@ -11,6 +11,12 @@ This is a simple prototype shooter inspired by Doom 64. The game is built with P
 python3 game.py
 ```
 
+## Running on Android
+The game can be packaged for Android with
+[Python for Android](https://github.com/kivy/python-for-android) or run
+with Pydroid3. Touch input is supported and a paired bluetooth gamepad can
+also be used.
+
 ### Controls
 - W/A/S/D: move the player
 - Left mouse button: shoot
