@@ -1,6 +1,7 @@
 import pygame
 import random
 import os
+import math
 
 WIDTH, HEIGHT = 800, 600
 FPS = 60
@@ -131,22 +132,27 @@ def draw_hud():
     screen.blit(points_text, (15,55))
 
 def handle_input():
-    global player_ammo
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_LEFT]:
+    if keys[pygame.K_a]:
         player_pos[0] -= player_speed
-    if keys[pygame.K_RIGHT]:
+    if keys[pygame.K_d]:
         player_pos[0] += player_speed
-    if keys[pygame.K_UP]:
+    if keys[pygame.K_w]:
         player_pos[1] -= player_speed
-    if keys[pygame.K_DOWN]:
+    if keys[pygame.K_s]:
         player_pos[1] += player_speed
 
 
-def shoot():
+def shoot(target_pos):
     global player_ammo
     if player_ammo > 0:
-        bullets.append({'pos':[player_pos[0], player_pos[1]-20], 'vel':[0,-10]})
+        dx = target_pos[0] - player_pos[0]
+        dy = target_pos[1] - player_pos[1]
+        dist = math.hypot(dx, dy)
+        if dist == 0:
+            dist = 1
+        vel = [dx / dist * 10, dy / dist * 10]
+        bullets.append({'pos': [player_pos[0], player_pos[1]], 'vel': vel})
         player_ammo -= 1
 
 
@@ -205,6 +211,13 @@ def draw_bullets():
         pygame.draw.circle(screen, (255,0,0), b['pos'], 2)
 
 
+def pause_menu():
+    screen.fill((0, 0, 0))
+    txt = font.render('Paused - ESC to resume, Q to quit', True, (255, 255, 255))
+    screen.blit(txt, (WIDTH // 2 - txt.get_width() // 2, HEIGHT // 2))
+    pygame.display.flip()
+
+
 def upgrade_menu():
     global state, points
     screen.fill((0,0,0))
@@ -258,11 +271,16 @@ def main():
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
-                elif event.key == pygame.K_SPACE:
-                    shoot()
-                elif event.key == pygame.K_u:
+                    if state == 'pause':
+                        state = 'play'
+                    else:
+                        state = 'pause'
+                elif event.key == pygame.K_u and state == 'play':
                     state = 'upgrade'
+                elif event.key == pygame.K_q and state == 'pause':
+                    running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and state == 'play':
+                shoot(event.pos)
         if state == 'play':
             handle_input()
             update_bullets()
@@ -282,6 +300,8 @@ def main():
             clock.tick(FPS)
         elif state == 'upgrade':
             upgrade_menu()
+        elif state == 'pause':
+            pause_menu()
     pygame.quit()
 
 
